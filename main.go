@@ -8,11 +8,19 @@ import (
 )
 
 func main() {
-	em := eventmanager.Initialize(false)
+	// initialize eventmanager
+	config := eventmanager.EventManagerConfig{
+		SynchronousProcessing: false,
+	}
+	em, _ := eventmanager.Initialize(&config)
 
+	time.Sleep(1 * time.Second)
+
+	// add some handlers for testing
 	em.Subscribe(em.Handler(handleEvent))
 	em.Subscribe(em.Handler(handleEvent2))
 
+	// produce some events for testing
 	for range make([]int, 2) {
 		em.Publish(em.Event([]byte(`{"test": { "hello": "schmutje" } }`)))
 	}
@@ -22,11 +30,16 @@ func main() {
 	// print history
 	history := em.History()
 	for i, ev := range history {
-		fmt.Printf("event %d: %s\n", len(history)-i, ev.Metadata.UID)
+		time1 := time.Unix(ev.Metadata.CreatedAt.GetSeconds(), int64(ev.Metadata.CreatedAt.GetNanos()))
+		time2 := time.Unix(ev.Metadata.EndedAt.GetSeconds(), int64(ev.Metadata.EndedAt.GetNanos()))
+		duration := time2.Sub(time1)
+		secondsDifference := int64(duration.Seconds())
+
+		fmt.Printf("event %d: %s\n", len(history)-i, ev.Metadata.Uid)
 		fmt.Println("-------------------------------------")
-		fmt.Println(" - created: " + ev.Metadata.CreatedAt.Local().String())
-		fmt.Println(" - ended:   " + ev.Metadata.EndedAt.Local().String())
-		fmt.Printf(" - duration:   %f seconds\n", ev.Metadata.EndedAt.Sub(ev.Metadata.CreatedAt).Seconds())
+		fmt.Println(" - created: " + ev.Metadata.CreatedAt.String())
+		fmt.Println(" - ended:   " + ev.Metadata.EndedAt.String())
+		fmt.Printf(" - duration:   %d seconds\n", secondsDifference)
 		fmt.Println("")
 	}
 }

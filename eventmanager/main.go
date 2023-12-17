@@ -3,98 +3,84 @@ package eventmanager
 
 import (
 	"fmt"
-	"sync"
-	"time"
+	"log"
+	"os"
 
-	log "github.com/sirupsen/logrus"
+	petname "github.com/dustinkirkland/golang-petname"
+	memberlist "github.com/hashicorp/memberlist"
 )
 
+var logger *log.Logger
+
 func init() {
-	log.SetFormatter(&log.JSONFormatter{})
+	logger = log.New(
+		os.Stderr,
+		"eventmanager: ",
+		log.Ldate|log.Ltime|log.Lmicroseconds|log.LUTC|log.Lshortfile,
+	)
 }
 
 // initializes a new event manager
-func Initialize(synchronous bool) *EventManager {
-	log.Info("initialize a new event manager:")
-	log.Info(fmt.Sprintf("- synchronous-mode: %v", synchronous))
+func Initialize(config *EventManagerConfig) (*EventManager, error) {
+	nodeName := petname.Generate(2, "-")
+	logger.Printf("initialize a new event manager: %s", nodeName)
+
+	// initialize memberlist
+	memberList, err := initializeMemberList(nodeName, config.MemberListAddress)
+	if err != nil {
+		return nil, fmt.Errorf("error while joining memberlist: %s", err.Error())
+	}
+
+	// initialize event manager
+	logger.Printf("- synchronous-mode: %v", config.SynchronousProcessing)
 	em := &EventManager{
 		eventChannel:  make(chan Event),
-		synchronous:   synchronous,
+		config:        config,
 		eventHandlers: make([]EventHandler, 0),
-	}
-	return em
-}
-
-// function to publish a new event on eventmanager
-func (em *EventManager) Publish(event Event) {
-
-	// set created timestamp
-	event.Metadata.UID = em.GenerateUUID()
-	event.Metadata.CreatedAt = time.Now()
-	log.Info(fmt.Sprintf("publish new event: %s", event.Metadata.UID))
-
-	if em.synchronous {
-		em.handleEventSynchronously(event)
-	} else {
-		go em.handleEventAsynchronously(event)
-	}
-}
-
-// process an event synchronously
-// - send to all handlers in series
-// - wait for each handler to finish before sending next event
-func (em *EventManager) handleEventSynchronously(event Event) {
-	for i := range em.eventHandlers {
-		log.Info(fmt.Sprintf("send event %s to handler %s", event.Metadata.UID, em.eventHandlers[i].uid))
-		em.eventHandlers[i].handler(event)
-		log.Info(fmt.Sprintf("handler %s finished processing event %s", em.eventHandlers[i].uid, event.Metadata.UID))
+		memberList:    memberList,
 	}
 
-	// set the ended timestamp
-	event.Metadata.EndedAt = time.Now()
+	// start listening for events
+	go initializeSyncListener()
 
-	log.Info(fmt.Sprintf("event %s has been processed by all handlers", event.Metadata.UID))
-
-	// push event to history
-	em.addEventToHistory(event)
+	return em, nil
 }
 
-// process an event asynchronously
-// - send to all handlers in parallel
-// - wait for all to finish
-func (em *EventManager) handleEventAsynchronously(event Event) {
-	var wg sync.WaitGroup
+func initializeSyncListener() {
+	for {
+		receivedEvent, err := receiveEvent("localhost:8087")
+		if err != nil {
+			logger.Printf("could not start event receiver / synchronisation: %s", err)
+		}
+		logger.Printf("Received Event: %+v\n", receivedEvent)
+	}
+}
 
-	for i := range em.eventHandlers {
-		wg.Add(1)
-		go func(index int) {
-			log.Info(fmt.Sprintf("send event %s to handler %s", event.Metadata.UID, em.eventHandlers[index].uid))
-			defer wg.Done()
-			em.eventHandlers[index].handler(event)
-			log.Info(fmt.Sprintf("handler %s finished processing event %s", em.eventHandlers[index].uid, event.Metadata.UID))
-		}(i)
+// initialize memberlist
+func initializeMemberList(nodeName string, memberListAddress string) (*memberlist.Memberlist, error) {
+	logger.Printf("prepare to join memberlist")
+	config := memberlist.DefaultLocalConfig()
+	config.Name = nodeName
+	config.BindAddr = "127.0.0.1"
+	config.BindPort = 8080
+	config.Logger = logger
+	memberList, err := memberlist.Create(config)
+
+	if err != nil {
+		return nil, fmt.Errorf("error initializing cluster node with error %v", err)
 	}
 
-	// wait for completion of all handlers
-	wg.Wait()
+	// join the memberlist
+	logger.Printf("joining memberlist")
+	ma, _ := resolveMemberlistDNSName(memberListAddress)
+	memberList.Join(ma)
 
-	// set the ended timestamp
-	event.Metadata.EndedAt = time.Now()
-
-	log.Info(fmt.Sprintf("event %s has been processed by all handlers", event.Metadata.UID))
-
-	// push event to history
-	em.addEventToHistory(event)
+	return memberList, nil
 }
 
-// function to subscribe to events from eventmanager
-func (em *EventManager) Subscribe(handler EventHandler) {
-	em.eventHandlers = append(em.eventHandlers, handler)
-}
-
-// create a new event object
-func (em *EventManager) Event(payload []byte) Event {
+func (em *EventManager) Event(event []byte) Event {
 	return Event{
-		Payload: payload,
+		Metadata: &EventMetadata{},
+		Payload:  event,
 	}
 }
