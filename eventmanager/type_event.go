@@ -3,17 +3,15 @@ package eventmanager
 import "time"
 
 type Event struct {
+	Metadata EventMetadata
+
+	// payload of the event
+	Payload []byte
+}
+
+type EventMetadata struct {
 	// generate a random id (uid) for each event
 	UID string
-
-	// Data is the payload of the event
-	Data interface{}
-
-	// event type
-	Type EventType
-
-	// event description (optional)
-	Description string
 
 	// created timestamp
 	CreatedAt time.Time
