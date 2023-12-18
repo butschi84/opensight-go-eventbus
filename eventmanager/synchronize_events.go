@@ -8,8 +8,8 @@ import (
 )
 
 // sendEvent sends an Event to a specified address.
-func sendEvent(event *Event, address string) error {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", address, "8087"))
+func (em *EventManager) sendEvent(event *Event, address string) error {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", address, em.config.EventSyncPort))
 	if err != nil {
 		return err
 	}

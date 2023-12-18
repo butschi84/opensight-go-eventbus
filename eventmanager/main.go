@@ -23,32 +23,42 @@ func init() {
 // initializes a new event manager
 func Initialize(config *EventManagerConfig) (*EventManager, error) {
 	nodeName := petname.Generate(2, "-")
-	logger.Printf("initialize a new event manager: %s", nodeName)
 
-	// initialize memberlist
-	memberList, err := initializeMemberList(nodeName, config.MemberListAddress)
-	if err != nil {
-		return nil, fmt.Errorf("error while joining memberlist: %s", err.Error())
+	// load default config
+	if config.MemberListBindPort == 0 {
+		config.MemberListBindPort = 8081
+	}
+	if config.EventSyncPort == 0 {
+		config.EventSyncPort = 8082
 	}
 
+	logger.Printf("initialize a new event manager: %s", nodeName)
+	logger.Printf("- memberlist bind port: %d", config.MemberListBindPort)
+	logger.Printf("- synchronous-mode:     %v", config.SynchronousProcessing)
+
 	// initialize event manager
-	logger.Printf("- synchronous-mode: %v", config.SynchronousProcessing)
 	em := &EventManager{
 		eventChannel:  make(chan Event),
 		config:        config,
 		eventHandlers: make([]EventHandler, 0),
-		memberList:    memberList,
+		memberList:    nil,
 	}
 
-	// start listening for events
-	go initializeSyncListener()
+	// initialize memberlist
+	err := em.initializeMemberList()
+	if err != nil {
+		return nil, fmt.Errorf("error while joining memberlist: %s", err.Error())
+	}
+
+	// start listening for events, give some time to start listening
+	go em.initializeSyncListener()
 
 	return em, nil
 }
 
-func initializeSyncListener() {
+func (em *EventManager) initializeSyncListener() {
 	for {
-		receivedEvent, err := receiveEvent("localhost:8087")
+		receivedEvent, err := receiveEvent(fmt.Sprintf("localhost:%d", em.config.EventSyncPort))
 		if err != nil {
 			logger.Printf("could not start event receiver / synchronisation: %s", err)
 		}
@@ -57,25 +67,26 @@ func initializeSyncListener() {
 }
 
 // initialize memberlist
-func initializeMemberList(nodeName string, memberListAddress string) (*memberlist.Memberlist, error) {
+func (em *EventManager) initializeMemberList() error {
 	logger.Printf("prepare to join memberlist")
 	config := memberlist.DefaultLocalConfig()
-	config.Name = nodeName
+	config.Name = em.config.name
 	config.BindAddr = "127.0.0.1"
-	config.BindPort = 8080
+	config.BindPort = em.config.MemberListBindPort
 	config.Logger = logger
 	memberList, err := memberlist.Create(config)
 
 	if err != nil {
-		return nil, fmt.Errorf("error initializing cluster node with error %v", err)
+		return fmt.Errorf("error initializing cluster node with error %v", err)
 	}
 
 	// join the memberlist
 	logger.Printf("joining memberlist")
-	ma, _ := resolveMemberlistDNSName(memberListAddress)
+	ma, _ := em.resolveMemberlistDNSName()
 	memberList.Join(ma)
 
-	return memberList, nil
+	em.memberList = memberList
+	return nil
 }
 
 func (em *EventManager) Event(event []byte) Event {

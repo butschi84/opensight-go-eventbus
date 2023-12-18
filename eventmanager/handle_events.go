@@ -23,8 +23,8 @@ func (em *EventManager) Publish(event Event) {
 
 	// send event to all members of memberlist
 	for _, member := range em.memberList.Members() {
-		logger.Printf("send event to member: %s:8087", member.Addr)
-		err := sendEvent(&event, member.Addr.String())
+		logger.Printf("send event to member: %s:%d", member.Addr, em.config.EventSyncPort)
+		err := em.sendEvent(&event, member.Addr.String())
 		if err != nil {
 			logger.Printf("failed to send event %s to peer %s: %s", &event.Metadata.Uid, member.Address(), err.Error())
 		}

@@ -1,7 +1,12 @@
 package eventmanager
 
 type EventManagerConfig struct {
-	MemberListAddress string
+	name string
+
+	MemberListAddress  string
+	MemberListBindPort int
+
+	EventSyncPort int
 
 	SynchronousProcessing bool
 }

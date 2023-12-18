@@ -14,7 +14,7 @@ func main() {
 	}
 	em, _ := eventmanager.Initialize(&config)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// add some handlers for testing
 	em.Subscribe(em.Handler(handleEvent))
