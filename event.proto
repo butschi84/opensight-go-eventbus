@@ -8,10 +8,11 @@ message EventMetadata {
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Timestamp ended_at = 3;
+  bool synchronized = 4;
+  string origin = 5;
 }
 
 message Event {
   EventMetadata metadata = 1;
   bytes payload = 2;
-  bool synchronized = 3;
 }

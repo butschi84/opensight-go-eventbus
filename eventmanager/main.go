@@ -23,7 +23,7 @@ func init() {
 
 // initializes a new event manager
 func Initialize(config *EventManagerConfig) (*EventManager, error) {
-	nodeName := petname.Generate(2, "-")
+	config.name = petname.Generate(2, "-")
 
 	// load default config
 	if config.MemberListBindAddress == "" {
@@ -42,10 +42,10 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 		config.EventSyncMaxRetransmissions = 5
 	}
 
-	logger.Printf("initialize a new event manager: %s", nodeName)
+	logger.Printf("initialize a new event manager: %s", config.name)
 	logger.Printf("- memberlist ring:")
 	logger.Printf("  - memberlist enabled:             %v", config.EventSyncEnabled)
-	logger.Printf("  - memberlist bind address:        %d", config.MemberListBindAddress)
+	logger.Printf("  - memberlist bind address:        %s", string(config.MemberListBindAddress))
 	logger.Printf("  - memberlist bind port:           %d", config.MemberListBindPort)
 	logger.Printf("- synchronous-event-processing:     %v", config.SynchronousProcessing)
 	logger.Printf("- event synchronisation:")
@@ -101,10 +101,11 @@ func (em *EventManager) initializeMemberList() error {
 func (em *EventManager) Event(event []byte) *Event {
 	return &Event{
 		Metadata: &EventMetadata{
-			Uid:       em.GenerateUUID(),
-			CreatedAt: timestamppb.Now(),
+			Uid:          em.GenerateUUID(),
+			CreatedAt:    timestamppb.Now(),
+			Synchronized: false, // this event is created locally by this eventmanager instance
+			Origin:       em.config.name,
 		},
-		Payload:      event,
-		Synchronized: false, // this event is created locally by this eventmanager instance
+		Payload: event,
 	}
 }

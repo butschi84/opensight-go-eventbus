@@ -74,6 +74,6 @@ func (em *EventManager) handleConnection(conn net.Conn) {
 func (em *EventManager) processEvent(event *Event) {
 	// Add your event processing logic here
 	logger.Printf("Processing event: %+v", event)
-	event.Synchronized = true
+	event.Metadata.Synchronized = true
 	em.Publish(event)
 }

@@ -79,7 +79,7 @@ func (em *EventManager) handleEventAsynchronously(event Event) {
 }
 
 func (em *EventManager) synchronizeEventToPeers(event *Event) {
-	if em.config.EventSyncEnabled && !event.Synchronized {
+	if em.config.EventSyncEnabled && !event.Metadata.Synchronized {
 		// send event to all members of memberlist
 		for _, member := range em.memberList.Members() {
 			// dont send events to oneself
