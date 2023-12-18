@@ -13,4 +13,5 @@ message EventMetadata {
 message Event {
   EventMetadata metadata = 1;
   bytes payload = 2;
+  bool synchronized = 3;
 }

@@ -3,8 +3,9 @@ package eventmanager
 type EventManagerConfig struct {
 	name string
 
-	MemberListAddress  string
-	MemberListBindPort int
+	MemberListAddress     string
+	MemberListBindAddress string
+	MemberListBindPort    int
 
 	EventSyncEnabled                bool
 	EventSyncPort                   int

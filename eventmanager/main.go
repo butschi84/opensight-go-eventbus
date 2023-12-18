@@ -8,6 +8,7 @@ import (
 
 	petname "github.com/dustinkirkland/golang-petname"
 	memberlist "github.com/hashicorp/memberlist"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var logger *log.Logger
@@ -25,6 +26,9 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 	nodeName := petname.Generate(2, "-")
 
 	// load default config
+	if config.MemberListBindAddress == "" {
+		config.MemberListBindAddress = "127.0.0.1"
+	}
 	if config.MemberListBindPort == 0 {
 		config.MemberListBindPort = 8081
 	}
@@ -41,6 +45,7 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 	logger.Printf("initialize a new event manager: %s", nodeName)
 	logger.Printf("- memberlist ring:")
 	logger.Printf("  - memberlist enabled:             %v", config.EventSyncEnabled)
+	logger.Printf("  - memberlist bind address:        %d", config.MemberListBindAddress)
 	logger.Printf("  - memberlist bind port:           %d", config.MemberListBindPort)
 	logger.Printf("- synchronous-event-processing:     %v", config.SynchronousProcessing)
 	logger.Printf("- event synchronisation:")
@@ -64,20 +69,10 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 		}
 
 		// start listening for events, give some time to start listening
-		go em.initializeSyncListener()
+		go em.receiveEvents(fmt.Sprintf("127.0.0.1:%d", config.EventSyncPort))
 	}
 
 	return em, nil
-}
-
-func (em *EventManager) initializeSyncListener() {
-	for {
-		receivedEvent, err := em.receiveEvent(fmt.Sprintf("localhost:%d", em.config.EventSyncPort))
-		if err != nil {
-			logger.Printf("could not start event receiver / synchronisation: %s", err)
-		}
-		logger.Printf("Received Event: %+v\n", receivedEvent)
-	}
 }
 
 // initialize memberlist
@@ -85,7 +80,7 @@ func (em *EventManager) initializeMemberList() error {
 	logger.Printf("prepare to join memberlist")
 	config := memberlist.DefaultLocalConfig()
 	config.Name = em.config.name
-	config.BindAddr = "127.0.0.1"
+	config.BindAddr = em.config.MemberListBindAddress
 	config.BindPort = em.config.MemberListBindPort
 	config.Logger = logger
 	memberList, err := memberlist.Create(config)
@@ -105,7 +100,11 @@ func (em *EventManager) initializeMemberList() error {
 
 func (em *EventManager) Event(event []byte) *Event {
 	return &Event{
-		Metadata: &EventMetadata{},
-		Payload:  event,
+		Metadata: &EventMetadata{
+			Uid:       em.GenerateUUID(),
+			CreatedAt: timestamppb.Now(),
+		},
+		Payload:      event,
+		Synchronized: false, // this event is created locally by this eventmanager instance
 	}
 }

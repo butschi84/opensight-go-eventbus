@@ -21,14 +21,13 @@ func main() {
 
 	// add some handlers for testing
 	em.Subscribe(em.Handler(handleEvent))
-	em.Subscribe(em.Handler(handleEvent2))
 
 	// produce some events for testing
-	for range make([]int, 5) {
+	for range make([]int, 4) {
 		em.Publish(em.Event([]byte(`{"test": { "hello": "schmutje" } }`)))
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// print history
 	em.PrintHistory()
@@ -36,7 +35,4 @@ func main() {
 
 func handleEvent(e eventmanager.Event) {
 	time.Sleep(1000 * time.Millisecond)
-}
-func handleEvent2(e eventmanager.Event) {
-	time.Sleep(2000 * time.Millisecond)
 }
