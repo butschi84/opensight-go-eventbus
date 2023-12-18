@@ -6,7 +6,9 @@ type EventManagerConfig struct {
 	MemberListAddress  string
 	MemberListBindPort int
 
-	EventSyncPort int
+	EventSyncEnabled                bool
+	EventSyncPort                   int
+	EventSyncReceiveBufferSizeBytes int
 
 	SynchronousProcessing bool
 }

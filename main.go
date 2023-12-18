@@ -10,7 +10,8 @@ import (
 func main() {
 	// initialize eventmanager
 	config := eventmanager.EventManagerConfig{
-		SynchronousProcessing: false,
+		SynchronousProcessing: true,
+		EventSyncEnabled:      true,
 	}
 	em, _ := eventmanager.Initialize(&config)
 

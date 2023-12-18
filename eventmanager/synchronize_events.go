@@ -25,7 +25,7 @@ func (em *EventManager) sendEvent(event *Event, address string) error {
 }
 
 // receiveEvent listens for incoming events on a specified address.
-func receiveEvent(address string) (*Event, error) {
+func (em *EventManager) receiveEvent(address string) (*Event, error) {
 	logger.Printf("start listening for events on: %s", address)
 
 	ln, err := net.Listen("tcp", address)
@@ -40,7 +40,7 @@ func receiveEvent(address string) (*Event, error) {
 	}
 	defer conn.Close()
 
-	data := make([]byte, 1048576)
+	data := make([]byte, em.config.EventSyncReceiveBufferSizeBytes)
 	n, err := conn.Read(data)
 	if err != nil {
 		return nil, err

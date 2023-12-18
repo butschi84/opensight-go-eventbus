@@ -31,10 +31,19 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 	if config.EventSyncPort == 0 {
 		config.EventSyncPort = 8082
 	}
+	if config.EventSyncReceiveBufferSizeBytes == 0 {
+		config.EventSyncReceiveBufferSizeBytes = 1048576 // 1 MB
+	}
 
 	logger.Printf("initialize a new event manager: %s", nodeName)
-	logger.Printf("- memberlist bind port: %d", config.MemberListBindPort)
-	logger.Printf("- synchronous-mode:     %v", config.SynchronousProcessing)
+	logger.Printf("- memberlist ring:")
+	logger.Printf("  - memberlist enabled:             %v", config.EventSyncEnabled)
+	logger.Printf("  - memberlist bind port:           %d", config.MemberListBindPort)
+	logger.Printf("- synchronous-event-processing:     %v", config.SynchronousProcessing)
+	logger.Printf("- event synchronisation:")
+	logger.Printf("  - event synchronisation enabled:  %v", config.EventSyncEnabled)
+	logger.Printf("  - synchronisation bind port:      %d", config.EventSyncPort)
+	logger.Printf("  - receive buffer size:            %d", config.EventSyncReceiveBufferSizeBytes)
 
 	// initialize event manager
 	em := &EventManager{
@@ -44,21 +53,23 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 		memberList:    nil,
 	}
 
-	// initialize memberlist
-	err := em.initializeMemberList()
-	if err != nil {
-		return nil, fmt.Errorf("error while joining memberlist: %s", err.Error())
-	}
+	if config.EventSyncEnabled {
+		// initialize memberlist
+		err := em.initializeMemberList()
+		if err != nil {
+			return nil, fmt.Errorf("error while joining memberlist: %s", err.Error())
+		}
 
-	// start listening for events, give some time to start listening
-	go em.initializeSyncListener()
+		// start listening for events, give some time to start listening
+		go em.initializeSyncListener()
+	}
 
 	return em, nil
 }
 
 func (em *EventManager) initializeSyncListener() {
 	for {
-		receivedEvent, err := receiveEvent(fmt.Sprintf("localhost:%d", em.config.EventSyncPort))
+		receivedEvent, err := em.receiveEvent(fmt.Sprintf("localhost:%d", em.config.EventSyncPort))
 		if err != nil {
 			logger.Printf("could not start event receiver / synchronisation: %s", err)
 		}
