@@ -8,7 +8,7 @@ import (
 )
 
 // function to publish a new event on eventmanager
-func (em *EventManager) Publish(event Event) {
+func (em *EventManager) Publish(event *Event) {
 
 	// set created timestamp
 	event.Metadata.Uid = em.GenerateUUID()
@@ -16,18 +16,22 @@ func (em *EventManager) Publish(event Event) {
 	logger.Printf("publish new event: %s", event.Metadata.Uid)
 
 	if em.config.SynchronousProcessing {
-		em.handleEventSynchronously(event)
+		em.handleEventSynchronously(*event)
 	} else {
-		go em.handleEventAsynchronously(event)
+		go em.handleEventAsynchronously(*event)
 	}
 
 	if em.config.EventSyncEnabled {
 		// send event to all members of memberlist
 		for _, member := range em.memberList.Members() {
-			logger.Printf("send event to member: %s:%d", member.Addr, em.config.EventSyncPort)
-			err := em.sendEvent(&event, member.Addr.String())
-			if err != nil {
-				logger.Printf("failed to send event %s to peer %s: %s", &event.Metadata.Uid, member.Address(), err.Error())
+			for i := 0; i < em.config.EventSyncMaxRetransmissions; i++ {
+				logger.Printf("send event to member: %s:%d", member.Addr, em.config.EventSyncPort)
+				err := em.sendEvent(event, member.Addr.String())
+				if err != nil {
+					logger.Printf("failed to send event %s to peer %s: %s", event.Metadata.Uid, member.Address(), err.Error())
+				} else {
+					break
+				}
 			}
 		}
 	}
@@ -49,7 +53,9 @@ func (em *EventManager) handleEventSynchronously(event Event) {
 	logger.Printf("event %s has been processed by all handlers", event.Metadata.Uid)
 
 	// push event to history
-	em.addEventToHistory(event)
+	if em.config.EventHistoryEnabled {
+		em.addEventToHistory(event)
+	}
 }
 
 // process an event asynchronously
@@ -77,5 +83,7 @@ func (em *EventManager) handleEventAsynchronously(event Event) {
 	logger.Printf(fmt.Sprintf("event %s has been processed by all handlers", event.Metadata.Uid))
 
 	// push event to history
-	em.addEventToHistory(event)
+	if em.config.EventHistoryEnabled {
+		em.addEventToHistory(event)
+	}
 }

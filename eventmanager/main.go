@@ -34,6 +34,9 @@ func Initialize(config *EventManagerConfig) (*EventManager, error) {
 	if config.EventSyncReceiveBufferSizeBytes == 0 {
 		config.EventSyncReceiveBufferSizeBytes = 1048576 // 1 MB
 	}
+	if config.EventSyncMaxRetransmissions == 0 {
+		config.EventSyncMaxRetransmissions = 5
+	}
 
 	logger.Printf("initialize a new event manager: %s", nodeName)
 	logger.Printf("- memberlist ring:")
@@ -92,16 +95,16 @@ func (em *EventManager) initializeMemberList() error {
 	}
 
 	// join the memberlist
-	logger.Printf("joining memberlist")
 	ma, _ := em.resolveMemberlistDNSName()
+	logger.Printf("joining memberlist: %v", ma)
 	memberList.Join(ma)
 
 	em.memberList = memberList
 	return nil
 }
 
-func (em *EventManager) Event(event []byte) Event {
-	return Event{
+func (em *EventManager) Event(event []byte) *Event {
+	return &Event{
 		Metadata: &EventMetadata{},
 		Payload:  event,
 	}
